@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
@@ -10,20 +11,24 @@ public class SimulationLogic : MonoBehaviour
     [SerializeField] Tilemap nextState;
     [SerializeField] Tile AliveTile;
     [SerializeField] Tile DeadTile;
+    [SerializeField] Tile Hollow;
     [SerializeField] StartingPatterns pattern;
     [SerializeField] float UpdateInterval;
+    Coroutine coroutine;
+    [SerializeField] float dis;
 
     HashSet<Vector3Int> AliveCells = new HashSet<Vector3Int>();
     HashSet<Vector3Int> NeedToCheckCells = new HashSet<Vector3Int>();
 
-    bool isDrag = false;
+    bool pause = false;
 
+    bool isDrag = false;
+    bool started = false;
     private void Start()
     {
         //SetPatterns(pattern);
         isDrag = false;
     }
-
     void SetPatterns(StartingPatterns pattern)
     {
         clear();
@@ -39,6 +44,7 @@ public class SimulationLogic : MonoBehaviour
 
     private void Update()
     {
+
         if (Input.GetMouseButtonDown(0))
         {
             isDrag = true;
@@ -49,9 +55,13 @@ public class SimulationLogic : MonoBehaviour
             isDrag = false;
         }
 
-        if (isDrag)
+        if (isDrag && !started)
         {
             SetTile();
+        }
+        if (!started)
+        {
+            ShowHollowTile();
         }
     }
 
@@ -68,7 +78,8 @@ public class SimulationLogic : MonoBehaviour
 
     public void StartSim()
     {
-        StartCoroutine(Simulation());
+        coroutine = StartCoroutine(Simulation());
+        started = true;
     }
 
     public void RestartSim()
@@ -169,4 +180,46 @@ public class SimulationLogic : MonoBehaviour
         }
     }
 
+    void ShowHollowTile()
+    {
+        Vector3 pos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Vector3Int coordinate = currentState.WorldToCell(pos);
+        if (currentState.GetTile(coordinate) == DeadTile)
+        {
+            currentState.SetTile(coordinate, Hollow);
+            StartCoroutine(RevarseHolloTile(coordinate));
+        }
+        
+    }
+
+    public void PausePlay()
+    {
+        if (pause)
+        {
+            pause = false;
+            coroutine = StartCoroutine(Simulation());
+            return;
+
+        }
+        if (!pause)
+        {
+            pause = true;
+            StopCoroutine(coroutine);
+            return;
+        }
+    }
+
+
+    public void SetInterval(float interval)
+    {
+        StopCoroutine(coroutine);
+        UpdateInterval -= interval;
+        coroutine = StartCoroutine(Simulation());
+    }
+
+    IEnumerator RevarseHolloTile(Vector3Int cord)
+    {
+        yield return new WaitForSeconds(.1f);
+        currentState.SetTile(cord,DeadTile);
+    }
 }
